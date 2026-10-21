@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GateBuddy — Repo Health & Docs Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --bg:#0a0a12;--bg2:#10101c;--card:#151524;--card-hover:#1a1a30;
+    --border:#252540;--text:#e4e4f0;--muted:#7a7a98;--accent:#00e5a0;
+    --accent-dim:rgba(0,229,160,0.1);--accent-mid:rgba(0,229,160,0.25);
+    --danger:#ff4757;--danger-dim:rgba(255,71,87,0.12);
+    --warning:#ffa502;--warning-dim:rgba(255,165,2,0.12);
+    --info:#ffd32a;--info-dim:rgba(255,211,42,0.12);
+    --diff-add-bg:rgba(0,229,160,0.1);--diff-add-text:#00e5a0;
+    --diff-rem-bg:rgba(255,71,87,0.1);--diff-rem-text:#ff6b7a;
+    --diff-ctx:#6a6a88;--shadow:0 4px 24px rgba(0,0,0,0.4);
+  }
+  [data-theme="light"] {
+    --bg:#f4f4f8;--bg2:#ececf2;--card:#ffffff;--card-hover:#f8f8fc;
+    --border:#dddde6;--text:#1a1a2e;--muted:#6b6b82;
+    --accent:#00c890;--accent-dim:rgba(0,200,144,0.08);--accent-mid:rgba(0,200,144,0.18);
+    --danger:#e0364a;--danger-dim:rgba(224,54,74,0.08);
+    --warning:#e09000;--warning-dim:rgba(224,144,0,0.08);
+    --info:#c8a800;--info-dim:rgba(200,168,0,0.08);
+    --diff-add-bg:rgba(0,200,144,0.1);--diff-add-text:#00a070;
+    --diff-rem-bg:rgba(224,54,74,0.1);--diff-rem-text:#d03040;
+    --diff-ctx:#8888a0;--shadow:0 4px 24px rgba(0,0,0,0.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .screen{display:none;min-height:100vh;}.screen.active{display:flex;flex-direction:column;}
+  .dot-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:32px 32px;opacity:.4;}
+  [data-theme="light"] .dot-bg{opacity:.3;}
+  .glow-blob{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,var(--accent-mid) 0%,transparent 70%);filter:blur(80px);pointer-events:none;animation:blobPulse 6s ease-in-out infinite;}
+  @keyframes blobPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:.9}}
+
+  /* Navbar */
+  .navbar{position:sticky;top:0;z-index:50;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);transition:background .3s;}
+  .nav-logo{font-weight:800;font-size:18px;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .nav-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;}
+  .nav-right{display:flex;align-items:center;gap:10px;}
+
+  /* Buttons */
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:10px;background:var(--accent);color:#0a0a12;font-weight:600;font-size:14px;border:none;cursor:pointer;transition:all .2s;font-family:inherit;}
+  .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-mid);}
+  .btn-primary:active{transform:translateY(0);}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;filter:none;box-shadow:none;}
+  .btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:10px;background:transparent;color:var(--text);font-weight:500;font-size:14px;border:1px solid var(--border);cursor:pointer;transition:all .2s;font-family:inherit;}
+  .btn-secondary:hover{background:var(--card);border-color:var(--muted);}
+  .btn-sm{padding:6px 14px;font-size:13px;border-radius:8px;}
+  .btn-xs{padding:4px 10px;font-size:12px;border-radius:6px;}
+  .btn-gh{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;border-radius:12px;background:#fff;color:#0d0d14;font-weight:700;font-size:16px;border:none;cursor:pointer;transition:all .2s;font-family:inherit;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+  .btn-gh:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.3);}
+  .btn-accept{background:var(--accent)!important;color:#0a0a12!important;border-color:var(--accent)!important;}
+  .btn-reject{background:var(--danger-dim)!important;color:var(--danger)!important;border:1px solid rgba(255,71,87,.2)!important;}
+
+  /* Cards */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;transition:all .2s;position:relative;}
+  .card:hover{background:var(--card-hover);border-color:var(--muted);}
+  .card-highlight{border-color:var(--accent)!important;box-shadow:0 0 0 1px var(--accent),0 4px 24px var(--accent-dim)!important;}
+  .repo-card{cursor:pointer;display:flex;flex-direction:column;gap:12px;}
+  .repo-card .repo-name{font-weight:700;font-size:16px;}
+  .repo-card .repo-desc{color:var(--muted);font-size:13px;line-height:1.5;}
+  .lang-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--muted);}
+  .lang-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .meta-row{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+  .private-badge{font-size:10px;font-weight:700;background:var(--warning-dim);color:var(--warning);padding:2px 8px;border-radius:4px;letter-spacing:.5px;}
+
+  /* Severity */
+  .sev-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .sev-critical{background:var(--danger-dim);color:var(--danger);}
+  .sev-warning{background:var(--warning-dim);color:var(--warning);}
+  .sev-info{background:var(--info-dim);color:var(--info);}
+
+  /* Tabs */
+  .tab-bar{display:flex;gap:4px;background:var(--bg2);border-radius:10px;padding:4px;}
+  .tab-btn{padding:8px 20px;border-radius:8px;border:none;background:transparent;color:var(--muted);font-weight:500;font-size:14px;cursor:pointer;transition:all .2s;font-family:inherit;}
+  .tab-btn.active{background:var(--card);color:var(--text);box-shadow:var(--shadow);}
+  .tab-btn:hover:not(.active){color:var(--text);}
+
+  /* Issue card */
+  .issue-card{overflow:hidden;}
+  .issue-header{display:flex;align-items:center;gap:12px;cursor:pointer;padding:4px 0;flex-wrap:wrap;}
+  .issue-path{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);}
+  .issue-desc{font-size:13px;color:var(--text);flex:1;min-width:200px;}
+  .issue-chevron{color:var(--muted);transition:transform .2s;font-size:14px;}
+  .issue-chevron.open{transform:rotate(180deg);}
+  .issue-body{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;}
+  .issue-body.open{max-height:600px;padding-top:16px;}
+  .issue-actions{display:flex;gap:8px;margin-top:12px;}
+
+  /* Diff viewer */
+  .diff-view{background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;}
+  .diff-line{display:flex;padding:0 16px;}.diff-line:hover{filter:brightness(1.1);}
+  .diff-marker{width:24px;text-align:center;flex-shrink:0;user-select:none;font-weight:600;}
+  .diff-content{flex:1;white-space:pre-wrap;word-break:break-all;}
+  .diff-ctx{color:var(--diff-ctx);}.diff-remove{background:var(--diff-rem-bg);color:var(--diff-rem-text);}.diff-add{background:var(--diff-add-bg);color:var(--diff-add-text);}
+  .diff-remove .diff-marker{color:var(--diff-rem-text);}.diff-add .diff-marker{color:var(--diff-add-text);}
+
+  /* Stepper */
+  .stepper{display:flex;align-items:center;gap:0;margin:32px 0;}
+  .step{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);transition:color .3s;white-space:nowrap;}
+  .step.active{color:var(--accent);}.step.done{color:var(--accent);opacity:.6;}
+  .step-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all .3s;flex-shrink:0;}
+  .step.active .step-dot{border-color:var(--accent);background:var(--accent-dim);color:var(--accent);}
+  .step.done .step-dot{border-color:var(--accent);background:var(--accent);color:#0a0a12;}
+  .step-line{flex:1;height:2px;background:var(--border);margin:0 12px;min-width:20px;transition:background .3s;}
+  .step-line.done{background:var(--accent);}
+  .progress-bar-wrap{width:100%;max-width:480px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:16px 0;}
+  .progress-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s ease;box-shadow:0 0 12px var(--accent-mid);}
+
+  /* Score */
+  .score-ring{position:relative;width:160px;height:160px;}
+  .score-ring svg{transform:rotate(-90deg);}
+  .score-ring circle{fill:none;stroke-width:8;}
+  .score-ring .ring-bg{stroke:var(--border);}
+  .score-ring .ring-fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset 1.5s ease;}
+  .score-value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .score-num{font-size:42px;font-weight:900;letter-spacing:-2px;}
+  .score-label{font-size:12px;color:var(--muted);margin-top:-4px;}
+
+  /* README */
+  .readme-col{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:24px;overflow-y:auto;max-height:500px;flex:1;min-width:0;}
+  .readme-col h1,.readme-col h2,.readme-col h3{margin:16px 0 8px;font-weight:700;}.readme-col h1{font-size:24px;}.readme-col h2{font-size:18px;}.readme-col h3{font-size:15px;}
+  .readme-col p{color:var(--muted);font-size:14px;line-height:1.7;margin:8px 0;}
+  .readme-col code{font-family:'JetBrains Mono',monospace;background:var(--card);padding:2px 6px;border-radius:4px;font-size:13px;}
+  .readme-col pre{background:var(--card);padding:16px;border-radius:8px;margin:12px 0;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;}
+  .readme-col ul,.readme-col ol{padding-left:20px;margin:8px 0;color:var(--muted);font-size:14px;line-height:1.8;}
+  .readme-col a{color:var(--accent);text-decoration:underline;}
+  .readme-section{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px;}
+  .readme-section:last-child{border-bottom:none;margin-bottom:0;}
+  .readme-section-ctrl{display:flex;gap:6px;margin-top:8px;align-items:center;}
+
+  /* Mascot */
+  .mascot-widget{position:fixed;bottom:24px;right:24px;z-index:100;width:72px;height:72px;border-radius:16px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);transition:all .3s;cursor:pointer;}
+  .mascot-widget:hover{transform:scale(1.05);border-color:var(--accent);}
+  .mascot-widget canvas{image-rendering:pixelated;image-rendering:crisp-edges;}
+  .landing-mascot-wrap{position:absolute;bottom:20px;right:40px;animation:mascotFloat 3s ease-in-out infinite;}
+  .landing-mascot-wrap canvas{image-rendering:pixelated;image-rendering:crisp-edges;}
+  @keyframes mascotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:24px;}
+  .modal-overlay.active{display:flex;}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px;max-width:520px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5);animation:modalIn .3s ease;position:relative;}
+  @keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+  .modal-close:hover{background:var(--card-hover);color:var(--text);border-color:var(--muted);}
+
+  /* Token input */
+  .token-input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;transition:all .2s;outline:none;}
+  .token-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+  .token-input::placeholder{color:var(--muted);opacity:.6;}
+
+  /* Connection status */
+  .conn-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;}
+  .conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .conn-connected .conn-dot{background:var(--accent);box-shadow:0 0 8px var(--accent-mid);}
+  .conn-disconnected .conn-dot{background:var(--muted);}
+  .conn-demo .conn-dot{background:var(--warning);}
+
+  /* Avatar */
+  .user-avatar{width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--accent);color:#0a0a12;transition:border-color .2s;}
+  .user-avatar:hover{border-color:var(--accent);}
+  .user-avatar img{width:100%;height:100%;object-fit:cover;}
+
+  /* Toast */
+  .toast-container{position:fixed;top:72px;right:24px;z-index:400;display:flex;flex-direction:column;gap:8px;}
+  .toast{padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;background:var(--card);border:1px solid var(--border);color:var(--text);box-shadow:var(--shadow);animation:toastIn .3s ease;display:flex;align-items:center;gap:8px;max-width:360px;}
+  .toast.out{animation:toastOut .3s ease forwards;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+
+  /* Theme toggle */
+  .theme-toggle{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+  .theme-toggle:hover{background:var(--card-hover);border-color:var(--muted);}
+
+  /* Stat card */
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center;transition:all .2s;}
+  .stat-card:hover{border-color:var(--muted);}
+  .stat-num{font-size:36px;font-weight:900;letter-spacing:-1px;}
+  .stat-label{font-size:13px;color:var(--muted);margin-top:4px;}
+
+  /* Loading spinner */
+  .spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Repo loading */
+  .repo-skeleton{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;animation:skeletonPulse 1.5s ease-in-out infinite;}
+  .repo-skeleton .sk-line{height:14px;border-radius:4px;background:var(--border);margin-bottom:10px;}
+  .repo-skeleton .sk-line:last-child{margin-bottom:0;width:60%;}
+  @keyframes skeletonPulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+  /* Disconnect dropdown */
+  .user-menu{position:relative;}
+  .user-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:var(--shadow);display:none;z-index:60;}
+  .user-dropdown.open{display:block;animation:modalIn .15s ease;}
+  .user-dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text);border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+  .user-dropdown-item:hover{background:var(--card-hover);}
+  .user-dropdown-item.danger{color:var(--danger);}
+  .user-dropdown-item.danger:hover{background:var(--danger-dim);}
+  .user-dropdown-sep{height:1px;background:var(--border);margin:6px 0;}
+
+  /* Scan info */
+  .scan-info{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:8px 14px;background:var(--accent-dim);border-radius:8px;margin-bottom:16px;}
+  .scan-info i{color:var(--accent);}
+
+  ::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+  @media(max-width:768px){.stepper{flex-wrap:wrap;gap:8px;}.step-line{display:none;}.readme-compare{flex-direction:column!important;}.landing-mascot-wrap{right:16px;bottom:16px;}.modal{padding:28px;margin:16px;}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+</style>
+</head>
+<body>
+<div class="dot-bg" aria-hidden="true"></div>
+
+<!-- ===== LANDING ===== -->
+<section id="screen-landing" class="screen active" role="main">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+    <div class="glow-blob" style="top:-100px;left:50%;margin-left:-250px;" aria-hidden="true"></div>
+    <div style="text-align:center;position:relative;z-index:2;padding:0 24px;max-width:560px;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;">
+        <span style="width:12px;height:12px;border-radius:50%;background:var(--accent);display:inline-block;box-shadow:0 0 16px var(--accent-mid);"></span>
+        <span style="font-size:14px;font-weight:600;color:var(--muted);letter-spacing:2px;text-transform:uppercase;">GitBuddy</span>
+      </div>
+      <h1 style="font-size:clamp(32px,6vw,52px);font-weight:900;letter-spacing:-2px;line-height:1.1;margin-bottom:16px;">
+        Scan your repo.<br>Fix what's broken.<br><span style="color:var(--accent);">Ship with confidence.</span>
+      </h1>
+      <p style="font-size:17px;color:var(--muted);line-height:1.6;margin-bottom:40px;max-width:420px;margin-left:auto;margin-right:auto;">
+        Connect your GitHub account to scan real repositories for code errors and documentation issues, with smart fix suggestions.
+      </p>
+      <button class="btn-gh" id="btn-signin" aria-label="Connect to GitHub">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Connect with GitHub
+      </button>
+      <p style="font-size:12px;color:var(--muted);margin-top:16px;opacity:.6;">Uses your GitHub token — scans run client-side, nothing stored.</p>
+    </div>
+    <div class="landing-mascot-wrap" aria-hidden="true">
+      <canvas id="mascot-landing" width="96" height="96"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DASHBOARD ===== -->
+<section id="screen-dashboard" class="screen" role="main">
+  <nav class="navbar" role="navigation">
+    <div class="nav-logo" onclick="showScreen('landing')"><span class="dot"></span> GitBuddy</div>
+    <div class="nav-right">
+      <div class="conn-status" id="conn-status"></div>
+      <button class="theme-toggle" id="theme-toggle1" aria-label="Toggle theme"><i class="fas fa-sun"></i></button>
+      <div class="user-menu" id="user-menu"></div>
+    </div>
+  </nav>
+  <main style="flex:1;padding:32px 24px;max-width:900px;margin:0 auto;width:100%;position:relative;z-index:1;">
+    <div style="margin-bottom:28px;">
+      <h2 style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px;">Your Repositories</h2>
+      <p style="color:var(--muted);font-size:14px;" id="dash-subtitle">Select a repository to scan for issues.</p>
+    </div>
+    <div id="repo-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </main>
+  <div class="mascot-widget" id="mascot-corner" aria-hidden="true"><canvas width="48" height="48"></canvas></div>
+</section>
+
+<!-- ===== SCANNING ===== -->
+<section id="screen-scanning" class="screen" role="main">
+  <nav class="navbar" role="navigation">
+    <div class="nav-logo"><span class="dot"></span> GitBuddy</div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-toggle2" aria-label="Toggle theme"><i class="fas fa-sun"></i></button>
+      <div class="user-menu" id="user-menu2"></div>
+    </div>
+  </nav>
+  <main style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;position:relative;z-index:1;">
+    <div id="scan-mascot-wrap" style="margin-bottom:24px;">
+      <canvas id="mascot-scanning" width="128" height="128" style="image-rendering:pixelated;image-rendering:crisp-edges;"></canvas>
+    </div>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;" id="scan-repo-name">Scanning repository...</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:8px;" id="scan-status-text">Initializing</p>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="scan-progress-bar" style="width:0%"></div></div>
+    <div class="stepper" id="scan-stepper">
+      <div class="step active" data-step="0"><div class="step-dot">1</div><span>Fetching repo</span></div>
+      <div class="step-line" data-line="0"></div>
+      <div class="step" data-step="1"><div class="step-dot">2</div><span>Analyzing code</span></div>
+      <div class="step-line" data-line="1"></div>
+      <div class="step" data-step="2"><div class="step-dot">3</div><span>Reviewing docs</span></div>
+      <div class="step-line" data-line="2"></div>
+      <div class="step" data-step="3"><div class="step-dot">4</div><span>Done</span></div>
+    </div>
+  </main>
+</section>
+
+<!-- ===== RESULTS ===== -->
+<section id="screen-results" class="screen" role="main">
+  <nav class="navbar" role="navigation">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <button class="btn-secondary btn-sm" id="btn-back-dash" aria-label="Back"><i class="fas fa-arrow-left" style="font-size:12px;"></i> Back</button>
+      <div class="nav-logo"><span class="dot"></span> GateBuddy</div>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-toggle3" aria-label="Toggle theme"><i class="fas fa-sun"></i></button>
+      <div class="user-menu" id="user-menu3"></div>
+    </div>
+  </nav>
+  <main style="flex:1;padding:32px 24px;max-width:900px;margin:0 auto;width:100%;position:relative;z-index:1;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">
+      <div>
+        <h2 style="font-size:22px;font-weight:800;letter-spacing:-.5px;" id="results-repo-name">repo-name</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;" id="results-counter">0 of 0 reviewed</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn active" data-tab="code" role="tab" aria-selected="true">Code Issues</button>
+          <button class="tab-btn" data-tab="docs" role="tab" aria-selected="false">Documentation Issues</button>
+        </div>
+        <button class="btn-primary btn-sm" id="btn-go-readme"><i class="fas fa-file-alt" style="font-size:12px;"></i> Review README</button>
+      </div>
+    </div>
+    <div id="issues-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </main>
+  <div class="mascot-widget" id="mascot-corner2" aria-hidden="true"><canvas width="48" height="48"></canvas></div>
+</section>
+
+<!-- ===== README REVIEW ===== -->
+<section id="screen-readme" class="screen" role="main">
+  <nav class="navbar" role="navigation">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <button class="btn-secondary btn-sm" id="btn-back-results" aria-label="Back"><i class="fas fa-arrow-left" style="font-size:12px;"></i> Back</button>
+      <div class="nav-logo"><span class="dot"></span> GateBuddy</div>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-toggle4" aria-label="Toggle theme"><i class="fas fa-sun"></i></button>
+      <div class="user-menu" id="user-menu4"></div>
+    </div>
+  </nav>
+  <main style="flex:1;padding:32px 24px;max-width:1100px;margin:0 auto;width:100%;position:relative;z-index:1;">
+    <div style="margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+      <div>
+        <h2 style="font-size:22px;font-weight:800;letter-spacing:-.5px;">README Improvements</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Review each section and accept or reject changes.</p>
+      </div>
+      <button class="btn-primary" id="btn-go-summary">View Summary <i class="fas fa-arrow-right" style="font-size:12px;"></i></button>
+    </div>
+    <div class="readme-compare" id="readme-compare" style="display:flex;gap:20px;"></div>
+  </main>
+</section>
+
+<!-- ===== SUMMARY ===== -->
+<section id="screen-summary" class="screen" role="main">
+  <nav class="navbar" role="navigation">
+    <div class="nav-logo"><span class="dot"></span> GateBuddy</div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-toggle5" aria-label="Toggle theme"><i class="fas fa-sun"></i></button>
+      <div class="user-menu" id="user-menu5"></div>
+    </div>
+  </nav>
+  <main style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;position:relative;z-index:1;">
+    <div style="text-align:center;margin-bottom:40px;">
+      <h2 style="font-size:28px;font-weight:900;letter-spacing:-1px;margin-bottom:4px;">Repo Health Report</h2>
+      <p style="color:var(--muted);font-size:15px;" id="summary-repo-name">repo-name</p>
+    </div>
+    <div class="score-ring" id="score-ring" style="margin-bottom:36px;">
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        <circle class="ring-bg" cx="80" cy="80" r="68"/>
+        <circle class="ring-fg" id="score-fg" cx="80" cy="80" r="68" stroke-dasharray="427.26" stroke-dashoffset="427.26"/>
+      </svg>
+      <div class="score-value"><div class="score-num" id="score-num">0</div><div class="score-label">Health Score</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;max-width:600px;width:100%;margin-bottom:36px;">
+      <div class="stat-card"><div class="stat-num" id="stat-found" style="color:var(--warning);">0</div><div class="stat-label">Issues Found</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-fixed" style="color:var(--accent);">0</div><div class="stat-label">Fixes Accepted</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-rejected" style="color:var(--muted);">0</div><div class="stat-label">Rejected</div></div>
+    </div>
+    <div id="summary-mascot-wrap" style="margin-bottom:32px;">
+      <canvas id="mascot-summary" width="128" height="128" style="image-rendering:pixelated;image-rendering:crisp-edges;"></canvas>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn-primary" id="btn-scan-another"><i class="fas fa-redo" style="font-size:13px;"></i> Scan Another Repo</button>
+      <button class="btn-secondary" id="btn-open-pr"><i class="fab fa-github" style="font-size:14px;"></i> Open PR with Fixes</button>
+    </div>
+  </main>
+</section>
+
+<!-- ===== CONNECT MODAL ===== -->
+<div class="modal-overlay" id="connect-modal" role="dialog" aria-modal="true" aria-label="Connect to GitHub">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()" aria-label="Close"><i class="fas fa-times"></i></button>
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:14px;background:var(--accent-dim);margin-bottom:16px;">
+        <svg width="28" height="28" viewBox="0 0 16 16" fill="var(--accent)"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <h3 style="font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;">Connect to GitHub</h3>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;">Paste a Personal Access Token to scan your real repositories, or try demo mode with sample data.</p>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:8px;">Personal Access Token</label>
+      <input type="password" class="token-input" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+        <input type="checkbox" id="token-remember" style="accent-color:var(--accent);">
+        <label for="token-remember" style="font-size:12px;color:var(--muted);cursor:pointer;">Remember token in this session</label>
+      </div>
+    </div>
+
+    <div id="token-error" style="display:none;padding:10px 14px;border-radius:8px;background:var(--danger-dim);border:1px solid rgba(255,71,87,.15);color:var(--danger);font-size:13px;margin-bottom:16px;"></div>
+
+    <button class="btn-primary" id="btn-connect-token" style="width:100%;justify-content:center;margin-bottom:12px;">
+      <i class="fab fa-github" style="font-size:16px;"></i> Connect with Token
+    </button>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:20px 0;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <span style="font-size:12px;color:var(--muted);font-weight:500;">or</span>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <button class="btn-secondary" id="btn-demo-mode" style="width:100%;justify-content:center;">
+      <i class="fas fa-flask" style="font-size:14px;"></i> Try Demo Mode
+    </button>
+
+    <div style="margin-top:20px;padding:14px;border-radius:10px;background:var(--bg);border:1px solid var(--border);">
+      <p style="font-size:12px;color:var(--muted);line-height:1.6;">
+        <i class="fas fa-shield-halved" style="color:var(--accent);margin-right:4px;"></i>
+        <strong style="color:var(--text);">How to get a token:</strong> Go to
+        <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">GitHub Settings → Tokens</a>
+        and generate a fine-grained token with <code style="font-family:'JetBrains Mono',monospace;background:var(--card);padding:1px 5px;border-radius:3px;font-size:11px;">repo</code> read access. Your token never leaves this browser.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<script>
+// ========================================
+// STATE & DATA
+// ========================================
+let state = {
+  screen:'landing', selectedRepo:null, activeTab:'code',
+  reviewedCount:0, totalIssues:0, acceptedCount:0, rejectedCount:0,
+  theme:'dark', mascotFrame:0, mascotState:'idle',
+  ghToken:null, ghUser:null, ghRepos:null, isDemo:false,
+  codeIssues:[], docIssues:[], readmeSections:[]
+};
+
+const DEMO_REPOS = [
+  { id:1,name:'gatebuddy-core',full_name:'devuser/gatebuddy-core',desc:'Core scanning engine and AST parser for multi-language support',lang:'TypeScript',langColor:'#3178c6',stars:234,updated:'2 hours ago',private:false,default_branch:'main' },
+  { id:2,name:'api-gateway',full_name:'devuser/api-gateway',desc:'High-performance API gateway with rate limiting and caching',lang:'Go',langColor:'#00add8',stars:1247,updated:'1 day ago',private:false,default_branch:'main' },
+  { id:3,name:'docs-site',full_name:'devuser/docs-site',desc:'Documentation website built with Astro and MDX',lang:'MDX',langColor:'#fcb32c',stars:56,updated:'3 days ago',private:false,default_branch:'main' },
+  { id:4,name:'cli-tools',full_name:'devuser/cli-tools',desc:'Command-line toolkit for repository management and automation',lang:'Rust',langColor:'#dea584',stars:890,updated:'5 days ago',private:false,default_branch:'main' },
+  { id:5,name:'ml-pipeline',full_name:'devuser/ml-pipeline',desc:'Machine learning data pipeline orchestration framework',lang:'Python',langColor:'#3572a5',stars:2134,updated:'1 week ago',private:false,default_branch:'main' },
+  { id:6,name:'infra-config',full_name:'devuser/infra-config',desc:'Terraform infrastructure as code for multi-cloud deployment',lang:'HCL',langColor:'#844fba',stars:34,updated:'2 weeks ago',private:true,default_branch:'main' },
+  { id:7,name:'design-tokens',full_name:'devuser/design-tokens',desc:'Shared design tokens and theme configuration for all products',lang:'JSON',langColor:'#6b6b80',stars:12,updated:'3 weeks ago',private:false,default_branch:'main' },
+  { id:8,name:'legacy-migration',full_name:'devuser/legacy-migration',desc:'Legacy Java monolith decomposition and migration scripts',lang:'Java',langColor:'#b07219',stars:45,updated:'1 month ago',private:true,default_branch:'develop' },
+];
+
+const DEMO_CODE_ISSUES = [
+  { id:'c1',file:'src/parser/lexer.ts',line:12,severity:'warning',desc:'Unused import "Token" from "./types"',reviewed:false,accepted:null,
+    diff:{ctx:['// Lexer configuration','const DEFAULT_CONFIG = {'],rem:['import { Token, LexerState } from "./types";'],add:['import { LexerState } from "./types";']}},
+  { id:'c2',file:'src/fetcher/http.ts',line:45,severity:'critical',desc:'Unhandled promise rejection — no error check after fetch',reviewed:false,accepted:null,
+    diff:{ctx:['export async function fetchWrapper(url, options) {'],rem:['  const response = await fetch(url, options);','  return response.json();'],add:['  const response = await fetch(url, options);','  if (!response.ok) {','    throw new FetchError(`HTTP ${response.status}`, response);','  }','  return response.json();']}},
+  { id:'c3',file:'src/utils/helpers.ts',line:78,severity:'warning',desc:'Explicit "any" type disables type safety',reviewed:false,accepted:null,
+    diff:{ctx:['// Format output for display','function formatOutput(data) {'],rem:['  const result: any = data.map((item: any) => {'],add:['  const result = data.map((item: OutputItem) => {']}},
+  { id:'c4',file:'src/scanner/index.ts',line:23,severity:'info',desc:'Unreachable code after return statement',reviewed:false,accepted:null,
+    diff:{ctx:['  if (!filePath) {','    return null;','  }'],rem:['  return results;','  console.log("Scan complete"); // unreachable'],add:['  return results;']}},
+  { id:'c5',file:'src/watcher/fileWatcher.ts',line:156,severity:'critical',desc:'Event listener not removed — potential memory leak',reviewed:false,accepted:null,
+    diff:{ctx:['  watcher.on("change", (evt) => {','    scheduleScan(evt.path);','  });','  return watcher;'],rem:['  return watcher;'],add:['  watcher.on("change", (evt) => {','    scheduleScan(evt.path);','  });','','  // Return cleanup function','  return () => {','    watcher.close();','    watcher.removeAllListeners();','  };']}},
+  { id:'c6',file:'src/client/api.ts',line:89,severity:'warning',desc:'Deprecated API method — use v3 endpoint',reviewed:false,accepted:null,
+    diff:{ctx:['// Fetch scan results','async function getResults(scanId) {'],rem:['  return api.get(`/v2/scans/${scanId}`);'],add:['  return api.get(`/v3/scans/${scanId}/results`);']}},
+  { id:'c7',file:'src/handlers/webhook.ts',line:34,severity:'info',desc:'Missing return type annotation on exported function',reviewed:false,accepted:null,
+    diff:{ctx:['export async function handleWebhook(payload) {'],rem:['export async function handleWebhook(payload) {'],add:['export async function handleWebhook(payload: WebhookPayload): Promise<WebhookResponse> {']}},
+  { id:'c8',file:'src/debug/logger.ts',line:67,severity:'info',desc:'Console.log statement left in production code',reviewed:false,accepted:null,
+    diff:{ctx:['  } catch (err) {','    console.log("Debug: error caught", err);','    throw err;'],rem:['    console.log("Debug: error caught", err);'],add:['']}},
+];
+
+const DEMO_DOC_ISSUES = [
+  { id:'d1',file:'README.md',line:null,severity:'critical',desc:'Missing installation instructions',reviewed:false,accepted:null,
+    diff:{ctx:[],rem:[],add:['## Installation','','```bash','npm install gatebuddy-core','```']}},
+  { id:'d2',file:'CONTRIBUTING.md',line:null,severity:'warning',desc:'No CONTRIBUTING.md found',reviewed:false,accepted:null,
+    diff:{ctx:[],rem:[],add:['# Contributing','','1. Fork the repository','2. Create a feature branch','3. Run `npm install` and `npm run build`','4. Ensure `npm test` passes','5. Submit a pull request']}},
+  { id:'d3',file:'README.md',line:null,severity:'critical',desc:'API docs reference outdated v2 endpoints',reviewed:false,accepted:null,
+    diff:{ctx:['The API is available at:'],rem:['Base URL: `https://api.example.com/v2/`'],add:['Base URL: `https://api.example.com/v3/`','Rate limit: 1000 requests/minute']}},
+  { id:'d4',file:'src/scanner/index.ts',line:null,severity:'info',desc:'Missing JSDoc on 4 exported public methods',reviewed:false,accepted:null,
+    diff:{ctx:['export function scan(options) {'],rem:['export function scan(options) {'],add:['/**',' * Scans a repository for code and documentation issues',' * @param {ScanOptions} options - Configuration for the scan',' * @returns {Promise<ScanResult>} The scan results',' */','export function scan(options: ScanOptions): Promise<ScanResult> {']}},
+  { id:'d5',file:'CHANGELOG.md',line:null,severity:'warning',desc:'No changelog entries since v1.0',reviewed:false,accepted:null,
+    diff:{ctx:['# Changelog',''],rem:['## [1.0.0] - 2024-01-15','Initial release'],add:['## [2.4.0] - 2025-01-10','### Added','- Multi-language AST parsing','- Parallel file scanning','### Fixed','- Memory leak in file watcher','','## [1.0.0] - 2024-01-15','Initial release']}},
+  { id:'d6',file:'README.md',line:null,severity:'critical',desc:'Two broken links — 404 destinations detected',reviewed:false,accepted:null,
+    diff:{ctx:['See the [setup guide](https://docs.example.com/setup).','For API reference, see [here](https://docs.example.com/api/old).'],rem:['See the [setup guide](https://docs.example.com/setup).','For API reference, see [here](https://docs.example.com/api/old).'],add:['See the [setup guide](https://docs.example.com/v3/getting-started).','For API reference, see [here](https://docs.example.com/v3/api/reference).']}},
+  { id:'d7',file:'LICENSE',line:null,severity:'warning',desc:'No LICENSE file found',reviewed:false,accepted:null,
+    diff:{ctx:[],rem:[],add:['MIT License','','Copyright (c) 2024 GateBuddy Contributors','','Permission is hereby granted, free of charge...']}},
+];
+
+const DEMO_README = [
+  { id:'header',title:'Header',before:`<h1>gatebuddy-core</h1>\n<p>A scanning engine.</p>`,after:`<h1>gatebuddy-core</h1>\n<p>Fast, extensible code and documentation health scanner with multi-language AST parsing support.</p>\n<p>\n  <img src="https://img.shields.io/badge/version-2.4.0-00e5a0" alt="version">\n  <img src="https://img.shields.io/badge/license-MIT-888" alt="license">\n</p>`,accepted:null},
+  { id:'install',title:'Installation',before:`<p>Install it.</p>`,after:`<h2>Installation</h2>\n<pre>npm install gatebuddy-core</pre>\n<p>Requires Node.js 18 or later.</p>`,accepted:null},
+  { id:'usage',title:'Usage',before:`<h2>Usage</h2>\n<pre>const gb = require('gatebuddy-core');\ngb.scan();</pre>`,after:`<h2>Quick Start</h2>\n<pre>import { scan } from 'gatebuddy-core';\n\nconst results = await scan({\n  path: './src',\n  languages: ['typescript'],\n  checks: ['code', 'docs'],\n});</pre>`,accepted:null},
+  { id:'contrib',title:'Contributing',before:`<p>PRs welcome.</p>`,after:`<h2>Contributing</h2>\n<p>See <a href="./CONTRIBUTING.md">CONTRIBUTING.md</a> for guidelines. We use conventional commits and require tests for all changes.</p>`,accepted:null},
+  { id:'license',title:'License',before:'',after:`<h2>License</h2>\n<p>MIT — see <a href="./LICENSE">LICENSE</a> for details.</p>`,accepted:null},
+];
+
+// ========================================
+// GITHUB API
+// ========================================
+const GH_API = 'https://api.github.com';
+
+async function ghFetch(endpoint, token) {
+  const res = await fetch(GH_API + endpoint, {
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function validateToken(token) {
+  const user = await ghFetch('/user', token);
+  return user;
+}
+
+async function fetchUserRepos(token, page = 1, allRepos = []) {
+  const repos = await ghFetch(`/user/repos?sort=updated&direction=desc&per_page=30&page=${page}&type=owner`, token);
+  allRepos.push(...repos);
+  if (repos.length === 30) return fetchUserRepos(token, page + 1, allRepos);
+  return allRepos;
+}
+
+async function fetchRepoTree(token, owner, repo, branch) {
+  try {
+    const tree = await ghFetch(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, token);
+    return tree.tree || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function fetchFileContent(token, owner, repo, path) {
+  try {
+    const data = await ghFetch(`/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, token);
+    if (data.content) return atob(data.content.replace(/\n/g, ''));
+    return null;
+  } catch (e) { return null; }
+}
+
+// ========================================
+// REAL REPO SCANNER
+// ========================================
+async function scanRealRepo(repo) {
+  const token = state.ghToken;
+  const [owner, name] = repo.full_name.split('/');
+  const branch = repo.default_branch || 'main';
+
+  state.codeIssues = [];
+  state.docIssues = [];
+  state.readmeSections = [];
+
+  // Fetch file tree
+  const tree = await fetchRepoTree(token, owner, name, branch);
+  const filePaths = tree.filter(t => t.type === 'blob').map(t => t.path);
+
+  // Check documentation issues
+  const standardFiles = ['README.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md'];
+  const rootFiles = filePaths.filter(p => !p.includes('/'));
+
+  if (!rootFiles.some(f => f.toLowerCase() === 'readme.md')) {
+    state.docIssues.push({ id:'d_readme', file:'README.md', line:null, severity:'critical', desc:'No README.md found — repository lacks a landing document', reviewed:false, accepted:null,
+      diff:{ctx:[],rem:[],add:['# ' + name,'','Description of the project.','','## Installation','','```bash','npm install ' + name,'```','','## Usage','','See documentation for details.']}});
+  } else {
+    // Check README content
+    const readmeContent = await fetchFileContent(token, owner, name, 'README.md');
+    if (readmeContent) {
+      if (readmeContent.length < 100) {
+        state.docIssues.push({ id:'d_readme_short', file:'README.md', line:null, severity:'warning', desc:'README is very short (' + readmeContent.length + ' chars) — likely incomplete', reviewed:false, accepted:null,
+          diff:{ctx:['# ' + name],rem:[readmeContent.split('\n')[0] || ''],add:['# ' + name,'','> ' + (repo.desc || 'A well-documented project'),'','## Installation','## Usage','## Contributing','## License']}});
+      }
+      if (!readmeContent.includes('## Install') && !readmeContent.includes('## Setup') && !readmeContent.includes('## Getting Started')) {
+        state.docIssues.push({ id:'d_no_install', file:'README.md', line:null, severity:'warning', desc:'README missing installation or getting started section', reviewed:false, accepted:null,
+          diff:{ctx:[],rem:[],add:['## Installation','','```bash','git clone ' + (repo.ssh_url || `https://github.com/${owner}/${name}.git`),'cd ' + name,'npm install','```']}});
+      }
+      const linkMatches = readmeContent.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g);
+      for (const m of linkMatches) {
+        const url = m[2];
+        if (url.startsWith('http') && !url.includes('github.com') && !url.includes('shields.io') && !url.includes('img.shields')) {
+          try {
+            const r = await fetch(url, { method:'HEAD', mode:'no-cors' });
+          } catch(e) {
+            state.docIssues.push({ id:'d_broken_' + url.slice(0,20), file:'README.md', line:null, severity:'info', desc:`Possible broken link: ${url}`, reviewed:false, accepted:null,
+              diff:{ctx:[m[0]],rem:[m[0]],add:[`[${m[1]}](#fix-link)`]}});
+          }
+        }
+      }
+    }
+  }
+
+  if (!rootFiles.some(f => f.toLowerCase().startsWith('license'))) {
+    state.docIssues.push({ id:'d_license', file:'LICENSE', line:null, severity:'warning', desc:'No LICENSE file found — project lacks legal clarity', reviewed:false, accepted:null,
+      diff:{ctx:[],rem:[],add:['MIT License','','Copyright (c) ' + new Date().getFullYear() + ' ' + owner,'','Permission is hereby granted, free of charge...']}});
+  }
+
+  if (!rootFiles.some(f => f.toLowerCase() === 'contributing.md')) {
+    state.docIssues.push({ id:'d_contrib', file:'CONTRIBUTING.md', line:null, severity:'warning', desc:'No CONTRIBUTING.md found — contributors lack guidance', reviewed:false, accepted:null,
+      diff:{ctx:[],rem:[],add:['# Contributing','','1. Fork the repository','2. Create a feature branch from `main`','3. Make your changes and add tests','4. Ensure all tests pass','5. Submit a pull request']}});
+  }
+
+  if (!rootFiles.some(f => f.toLowerCase() === 'changelog.md')) {
+    state.docIssues.push({ id:'d_changelog', file:'CHANGELOG.md', line:null, severity:'info', desc:'No CHANGELOG.md found — release history not tracked', reviewed:false, accepted:null,
+      diff:{ctx:[],rem:[],add:['# Changelog','','## [Unreleased]','','## [1.0.0] - ' + new Date().toISOString().split('T')[0],'','- Initial release']}});
+  }
+
+  // Scan code files for common issues
+  const codeExts = ['.ts','.tsx','.js','.jsx','.py','.go','.rs','.java','.rb','.php','.c','.cpp','.h'];
+  const codeFiles = filePaths.filter(p => {
+    const ext = p.substring(p.lastIndexOf('.'));
+    return codeExts.includes(ext) && !p.includes('node_modules') && !p.includes('vendor') && !p.includes('.min.');
+  });
+
+  const filesToScan = codeFiles.slice(0, 30); // Limit to avoid rate limits
+  let scanned = 0;
+
+  for (const filePath of filesToScan) {
+    const content = await fetchFileContent(token, owner, name, filePath);
+    if (!content) continue;
+    scanned++;
+    const lines = content.split('\n');
+    const ext = filePath.substring(filePath.lastIndexOf('.'));
+
+    // Check for console.log
+    lines.forEach((line, idx) => {
+      if (/console\.log\s*\(/.test(line) && !/\/\/\s*eslint-disable/.test(line)) {
+        if (state.codeIssues.length < 20) {
+          state.codeIssues.push({ id:`cl_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'info', desc:'Console.log statement in code', reviewed:false, accepted:null,
+            diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:['']}});
+        }
+      }
+    });
+
+    // Check for TODO/FIXME
+    lines.forEach((line, idx) => {
+      if (/\bTODO\b|\bFIXME\b|\bHACK\b/.test(line) && state.codeIssues.length < 20) {
+        const match = line.match(/\b(TODO|FIXME|HACK)\b/)[0];
+        state.codeIssues.push({ id:`td_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'warning', desc:`Unresolved ${match} comment`, reviewed:false, accepted:null,
+          diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:['// Resolved: ' + line.trimEnd().replace(/\/\/\s*/, '')]}});
+      }
+    });
+
+    // TypeScript/JS specific
+    if (['.ts','.tsx','.js','.jsx'].includes(ext)) {
+      lines.forEach((line, idx) => {
+        // any type
+        if (/: any\b/.test(line) && state.codeIssues.length < 20) {
+          state.codeIssues.push({ id:`any_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'warning', desc:'Explicit "any" type disables type safety', reviewed:false, accepted:null,
+            diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:[line.trimEnd().replace(/: any/g, ': unknown')]}});
+        }
+        // Empty catch
+        if (/catch\s*\([^)]*\)\s*\{\s*\}/.test(line) && state.codeIssues.length < 20) {
+          state.codeIssues.push({ id:`ec_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'warning', desc:'Empty catch block — errors silently swallowed', reviewed:false, accepted:null,
+            diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:[line.trimEnd().replace(/\{\s*\}/, '{ console.error(err); }')]}});
+        }
+      });
+    }
+
+    // Python specific
+    if (ext === '.py') {
+      lines.forEach((line, idx) => {
+        if (/except\s*:/.test(line) && state.codeIssues.length < 20) {
+          state.codeIssues.push({ id:`be_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'warning', desc:'Bare except clause — catches all exceptions including KeyboardInterrupt', reviewed:false, accepted:null,
+            diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:[line.trimEnd().replace('except:', 'except Exception:')]}});
+        }
+        if (/print\s*\(/.test(line) && !line.trim().startsWith('#') && state.codeIssues.length < 20) {
+          state.codeIssues.push({ id:`pr_${filePath}_${idx}`, file:filePath, line:idx+1, severity:'info', desc:'Print statement in production code', reviewed:false, accepted:null,
+            diff:{ctx:lines.slice(Math.max(0,idx-1),idx).map(l=>l.trimEnd()),rem:[line.trimEnd()],add:['']}});
+        }
+      });
+    }
+  }
+
+  // Build README sections for review
+  const readmeContent = await fetchFileContent(token, owner, name, 'README.md');
+  if (readmeContent) {
+    state.readmeSections = [{ id:'current', title:'Current README', before:readmeContent, after:null, accepted:null }];
+  }
+
+  return { codeIssues: state.codeIssues, docIssues: state.docIssues, filesScanned: scanned };
+}
+
+// ========================================
+// MASCOT RENDERER
+// ========================================
+const offscreen = document.createElement('canvas');
+offscreen.width = 24; offscreen.height = 24;
+const octx = offscreen.getContext('2d');
+
+function px(x, y, color) {
+  if (x < 0 || x > 23 || y < 0 || y > 23) return;
+  octx.fillStyle = color; octx.fillRect(x, y, 1, 1);
+}
+
+function drawBody(m, d) {
+  px(7,1,d);px(8,1,d);px(15,1,d);px(16,1,d);
+  px(7,2,d);px(8,2,m);px(15,2,d);px(16,2,m);
+  for(let x=8;x<=15;x++)px(x,3,m);
+  for(let x=7;x<=16;x++)px(x,4,m);
+  for(let x=5;x<=18;x++){px(x,5,m);px(x,6,m);px(x,7,m);}
+  for(let x=6;x<=17;x++){px(x,8,m);px(x,9,m);}
+  for(let x=5;x<=18;x++){px(x,10,m);px(x,11,m);}
+  for(let x=7;x<=16;x++)px(x,12,m);
+  px(8,13,m);px(9,13,m);px(14,13,m);px(15,13,m);
+  px(8,14,d);px(9,14,d);px(14,14,d);px(15,14,d);
+}
+
+function renderMascot(canvas, mState, frame) {
+  const ctx = canvas.getContext('2d');
+  octx.clearRect(0,0,24,24);
+  const isDk = state.theme==='dark';
+  const m='#00e5a0',d='#00c890',w='#ffffff',bk=isDk?'#0d0d14':'#1a1a2e',bl='#ff9eb5',gl='#87ceeb',mt='#a0a0b8';
+  drawBody(m,d);
+  const blink = (frame%120)<6;
+  if(mState==='happy'){
+    for(let x=8;x<=10;x++)px(x,6,bk);for(let x=13;x<=15;x++)px(x,6,bk);
+    px(10,8,bk);px(11,9,bk);px(12,9,bk);px(13,8,bk);
+    px(7,8,bl);px(16,8,bl);
+    if(frame%30<15){px(3,2,'#ffd700');px(20,3,'#ffd700');}else{px(4,2,'#ffd700');px(20,2,'#ffd700');}
+  } else if(mState==='concerned'){
+    px(8,5,w);px(9,5,w);px(10,5,w);px(8,6,w);px(9,6,bk);px(10,6,w);px(8,7,w);px(9,7,w);px(10,7,w);
+    px(13,4,w);px(14,4,w);px(15,4,w);px(13,5,w);px(14,5,w);px(15,5,w);px(13,6,w);px(14,6,bk);px(15,6,w);px(13,7,w);px(14,7,w);px(15,7,w);
+    px(10,9,bk);px(11,8,bk);px(12,9,bk);px(13,8,bk);
+    px(19,4,gl);px(19,5,gl);px(19,6,gl);
+  } else if(mState==='scanning'){
+    if(blink){for(let x=8;x<=10;x++)px(x,6,bk);for(let x=13;x<=15;x++)px(x,6,bk);}
+    else{px(8,5,w);px(9,5,w);px(10,5,w);px(8,6,w);px(9,6,bk);px(10,6,w);px(8,7,w);px(9,7,w);px(10,7,w);px(13,5,w);px(14,5,w);px(15,5,w);px(13,6,w);px(14,6,bk);px(15,6,w);px(13,7,w);px(14,7,w);px(15,7,w);}
+    px(10,9,bk);px(11,9,bk);px(12,9,bk);
+    px(19,3,mt);px(20,3,mt);px(21,3,mt);px(19,4,mt);px(20,4,gl);px(21,4,mt);px(19,5,mt);px(20,5,mt);px(21,5,mt);px(21,6,mt);px(22,7,mt);px(23,8,mt);
+    const sY=2+(frame%16);if(sY<14){px(4,sY,m);px(19,sY,m);}
+  } else {
+    if(blink){for(let x=8;x<=10;x++)px(x,6,bk);for(let x=13;x<=15;x++)px(x,6,bk);}
+    else{px(8,5,w);px(9,5,w);px(10,5,w);px(8,6,w);px(9,6,bk);px(10,6,w);px(8,7,w);px(9,7,w);px(10,7,w);px(13,5,w);px(14,5,w);px(15,5,w);px(13,6,w);px(14,6,bk);px(15,6,w);px(13,7,w);px(14,7,w);px(15,7,w);}
+    px(10,9,bk);px(11,9,bk);px(12,9,bk);
+    px(7,7,bl);px(16,7,bl);
+  }
+  ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(offscreen,0,0,canvas.width,canvas.height);
+}
+
+// Animation loop
+let animId;
+function animate(){
+  state.mascotFrame++;
+  const lm=document.getElementById('mascot-landing');if(lm)renderMascot(lm,'idle',state.mascotFrame);
+  const sm=document.getElementById('mascot-scanning');if(sm)renderMascot(sm,'scanning',state.mascotFrame);
+  const smm=document.getElementById('mascot-summary');if(smm)renderMascot(smm,state.mascotState,state.mascotFrame);
+  document.querySelectorAll('.mascot-widget canvas').forEach(c=>renderMascot(c,state.mascotState,state.mascotFrame));
+  animId=requestAnimationFrame(animate);
+}
+
+// ========================================
+// UI HELPERS
+// ========================================
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('screen-'+name);
+  if(el){el.classList.add('active');el.style.animation='none';el.offsetHeight;el.style.animation='';}
+  state.screen=name;window.scrollTo(0,0);
+  updateUserMenus();
+}
+
+function toast(msg,icon='fa-check-circle',color='var(--accent)'){
+  const c=document.getElementById('toast-container'),t=document.createElement('div');
+  t.className='toast';t.innerHTML=`<i class="fas ${icon}" style="color:${color};"></i> ${msg}`;
+  c.appendChild(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),300);},3000);
+}
+
+function setTheme(t){
+  state.theme=t;document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-toggle i').forEach(i=>i.className=t==='dark'?'fas fa-sun':'fas fa-moon');
+}
+document.querySelectorAll('.theme-toggle').forEach(b=>b.addEventListener('click',()=>setTheme(state.theme==='dark'?'light':'dark')));
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function openModal(){document.getElementById('connect-modal').classList.add('active');document.getElementById('token-input').focus();}
+function closeModal(){document.getElementById('connect-modal').classList.remove('active');document.getElementById('token-error').style.display='none';}
+
+// Close modal on overlay click
+document.getElementById('connect-modal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeModal();});
+
+// ========================================
+// CONNECTION STATUS & USER MENU
+// ========================================
+function updateConnStatus(){
+  const el=document.getElementById('conn-status');
+  if(!el)return;
+  if(state.ghUser){
+    el.className='conn-status conn-connected';
+    el.innerHTML=`<span class="conn-dot"></span> <span style="color:var(--accent);">Connected</span>`;
+  } else if(state.isDemo){
+    el.className='conn-status conn-demo';
+    el.innerHTML=`<span class="conn-dot"></span> Demo`;
+  } else {
+    el.className='conn-status conn-disconnected';
+    el.innerHTML=`<span class="conn-dot"></span> Offline`;
+  }
+}
+
+function renderUserMenu(containerId){
+  const wrap = document.getElementById(containerId);
+  if(!wrap)return;
+  if(state.ghUser){
+    const u = state.ghUser;
+    wrap.innerHTML=`
+      <div class="user-avatar" onclick="toggleDropdown('${containerId}')" tabindex="0" role="button" aria-label="User menu">
+        ${u.avatar_url ? `<img src="${u.avatar_url}" alt="${u.login}" style="width:100%;height:100%;object-fit:cover;">` : u.login.charAt(0).toUpperCase()}
+      </div>
+      <div class="user-dropdown" id="dd-${containerId}">
+        <div style="padding:10px 14px;font-size:12px;color:var(--muted);">Signed in as <strong style="color:var(--text);">${escHtml(u.login)}</strong></div>
+        <div class="user-dropdown-sep"></div>
+        <button class="user-dropdown-item" onclick="openModal()"><i class="fas fa-key" style="width:16px;text-align:center;color:var(--muted);"></i> Change Token</button>
+        <div class="user-dropdown-sep"></div>
+        <button class="user-dropdown-item danger" onclick="disconnect()"><i class="fas fa-right-from-bracket" style="width:16px;text-align:center;"></i> Disconnect</button>
+      </div>`;
+  } else if(state.isDemo){
+    wrap.innerHTML=`
+      <div class="user-avatar" onclick="toggleDropdown('${containerId}')" tabindex="0" role="button" aria-label="User menu">D</div>
+      <div class="user-dropdown" id="dd-${containerId}">
+        <div style="padding:10px 14px;font-size:12px;color:var(--muted);">Demo mode</div>
+        <div class="user-dropdown-sep"></div>
+        <button class="user-dropdown-item" onclick="openModal()"><i class="fas fa-key" style="width:16px;text-align:center;color:var(--muted);"></i> Connect Real Account</button>
+        <div class="user-dropdown-sep"></div>
+        <button class="user-dropdown-item danger" onclick="disconnect()"><i class="fas fa-right-from-bracket" style="width:16px;text-align:center;"></i> Exit Demo</button>
+      </div>`;
+  } else {
+    wrap.innerHTML=`<div class="user-avatar" onclick="openModal()" tabindex="0" role="button" aria-label="Connect" title="Connect to GitHub"><i class="fas fa-plug" style="font-size:14px;color:#0a0a12;"></i></div>`;
+  }
+}
+
+function updateUserMenus(){
+  updateConnStatus();
+  ['user-menu','user-menu2','user-menu3','user-menu4','user-menu5'].forEach(id=>renderUserMenu(id));
+}
+
+function toggleDropdown(containerId){
+  const dd=document.getElementById('dd-'+containerId);
+  if(!dd)return;
+  const wasOpen=dd.classList.contains('open');
+  document.querySelectorAll('.user-dropdown').forEach(d=>d.classList.remove('open'));
+  if(!wasOpen)dd.classList.add('open');
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click',(e)=>{
+  if(!e.target.closest('.user-menu'))document.querySelectorAll('.user-dropdown').forEach(d=>d.classList.remove('open'));
+});
+
+function disconnect(){
+  state.ghToken=null;state.ghUser=null;state.ghRepos=null;state.isDemo=false;
+  sessionStorage.removeItem('gh_token');
+  document.querySelectorAll('.user-dropdown').forEach(d=>d.classList.remove('open'));
+  toast('Disconnected from GitHub','fa-right-from-bracket','var(--muted)');
+  showScreen('landing');
+}
+
+// ========================================
+// REPO RENDERING
+// ========================================
+function renderRepos(repos){
+  const list=document.getElementById('repo-list');
+  const source = repos || state.ghRepos || DEMO_REPOS;
+  const isReal = !!state.ghUser;
+
+  if(source.length === 0){
+    list.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--muted);">
+      <i class="fas fa-folder-open" style="font-size:40px;margin-bottom:16px;display:block;opacity:.4;"></i>
+      <p style="font-size:16px;font-weight:600;margin-bottom:4px;">No repositories found</p>
+      <p style="font-size:13px;">${isReal ? 'Your GitHub account has no public repositories.' : 'Try connecting your real GitHub account.'}</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML=source.map((r,i)=>{
+    const name = r.name || r.full_name.split('/')[1] || r.full_name;
+    const lang = r.language || '—';
+    const langColor = r.langColor || getLangColor(lang);
+    const stars = r.stars || r.stargazers_count || 0;
+    const desc = r.desc || r.description || 'No description';
+    const updated = r.updated || timeAgo(r.updated_at || r.pushed_at);
+    const isPrivate = r.private;
+    const isHighlight = i === 0;
+    const branch = r.default_branch || r.branch || 'main';
+    return `
+      <div class="card repo-card ${isHighlight?'card-highlight':''}" data-repo="${r.id||i}" tabindex="0" role="button" aria-label="Scan ${name}">
+        <div style="display:flex;align-items:start;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div class="repo-name" style="display:flex;align-items:center;gap:8px;">
+              ${isPrivate?'<span class="private-badge">PRIVATE</span>':''}
+              <span>${escHtml(name)}</span>
+            </div>
+            <div class="repo-desc">${escHtml(desc)}</div>
+          </div>
+          ${isHighlight?'<span style="font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:20px;white-space:nowrap;">Most Recent</span>':''}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div class="meta-row">
+            <span class="lang-badge"><span class="lang-dot" style="background:${langColor}"></span>${lang}</span>
+            <span><i class="fas fa-star" style="font-size:11px;"></i> ${stars.toLocaleString()}</span>
+            <span><i class="fas fa-code-branch" style="font-size:11px;"></i> ${escHtml(branch)}</span>
+            <span><i class="fas fa-clock" style="font-size:11px;"></i> ${updated}</span>
+          </div>
+          <button class="btn-primary btn-sm scan-btn" data-idx="${i}"><i class="fas fa-search" style="font-size:11px;"></i> Scan</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.repo-card').forEach(card=>{
+    card.addEventListener('click',(e)=>{if(e.target.closest('.scan-btn'))return;card.querySelector('.scan-btn').click();});
+    card.addEventListener('keydown',(e)=>{if(e.key==='Enter')card.querySelector('.scan-btn').click();});
+  });
+  list.querySelectorAll('.scan-btn').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{e.stopPropagation();startScan(parseInt(btn.dataset.idx));});
+  });
+}
+
+function getLangColor(lang){
+  const map={'TypeScript':'#3178c6','JavaScript':'#f7df1e','Python':'#3572a5','Go':'#00add8','Rust':'#dea584','Java':'#b07219','Ruby':'#701516','PHP':'#4F5D95','C':'#555555','C++':'#f34b7d','HCL':'#844fba','HTML':'#e34c26','CSS':'#563d7c','Shell':'#89e051','Dart':'#00B4AB','Kotlin':'#A97BFF','Swift':'#F05138','JSON':'#6b6b80','MDX':'#fcb32c','Markdown':'#083fa1','Jupyter Notebook':'#DA5B0B','Dockerfile':'#384d54','SCSS':'#c6538c','Vue':'#41b883','Svelte':'#ff3e00'};
+  return map[lang]||'#6b6b80';
+}
+
+function timeAgo(dateStr){
+  if(!dateStr)return '—';
+  const diff=Date.now()-new Date(dateStr).getTime();
+  const mins=Math.floor(diff/60000),hrs=Math.floor(diff/3600000),days=Math.floor(diff/86400000),weeks=Math.floor(diff/604800000),months=Math.floor(diff/2592000000);
+  if(mins<1)return 'just now';if(mins<60)return mins+' min ago';if(hrs<24)return hrs+' hour'+(hrs>1?'s':'')+' ago';if(days<7)return days+' day'+(days>1?'s':'')+' ago';if(weeks<5)return weeks+' week'+(weeks>1?'s':'')+' ago';return months+' month'+(months>1?'s':'')+' ago';
+}
+
+function showRepoSkeletons(){
+  const list=document.getElementById('repo-list');
+  list.innerHTML=Array(5).fill(0).map(()=>`<div class="repo-skeleton"><div class="sk-line" style="width:40%;"></div><div class="sk-line"></div><div class="sk-line" style="width:70%;"></div></div>`).join('');
+}
+
+// ========================================
+// SCAN FLOW
+// ========================================
+async function startScan(repoIdx){
+  const repos = state.ghRepos || DEMO_REPOS;
+  const repo = repos[repoIdx];
+  if(!repo) return;
+  state.selectedRepo = repo;
+
+  // Reset
+  state.activeTab='code'; state.reviewedCount=0; state.acceptedCount=0; state.rejectedCount=0;
+  state.mascotState='scanning';
+
+  showScreen('scanning');
+  const repoName = repo.name || repo.full_name.split('/')[1] || repo.full_name;
+  document.getElementById('scan-repo-name').textContent=`Scanning ${repoName}`;
+
+  // Setup stepper
+  const bar=document.getElementById('scan-progress-bar');
+  const statusText=document.getElementById('scan-status-text');
+  const stepperEl=document.getElementById('scan-stepper');
+  bar.style.width='0%';
+  stepperEl.querySelectorAll('.step').forEach((s,i)=>{s.className='step'+(i===0?' active':'');s.querySelector('.step-dot').innerHTML=i+1;});
+  stepperEl.querySelectorAll('.step-line').forEach(l=>l.className='step-line');
+
+  function setStep(idx, label, pct){
+    statusText.textContent=label;
+    for(let i=0;i<=idx;i++){
+      const s=stepperEl.querySelectorAll('.step')[i];
+      s.className='step done';s.querySelector('.step-dot').innerHTML='<i class="fas fa-check" style="font-size:11px;"></i>';
+    }
+    if(idx<3){stepperEl.querySelectorAll('.step')[idx+1].className='step active';}
+    for(let i=0;i<idx;i++){stepperEl.querySelectorAll('.step-line')[i].className='step-line done';}
+    bar.style.width=pct+'%';
+  }
+
+  if(state.ghUser && state.ghToken){
+    // Real scan with GitHub API
+    setStep(0, 'Fetching repository tree...', 15);
+    await sleep(600);
+
+    setStep(1, 'Analyzing code quality...', 40);
+    try {
+      const result = await scanRealRepo(repo);
+      setStep(2, 'Reviewing documentation...', 85);
+      await sleep(500);
+
+      state.totalIssues = state.codeIssues.length + state.docIssues.length;
+      setStep(3, 'Done — ' + state.totalIssues + ' issues found', 100);
+      await sleep(600);
+    } catch(e) {
+      toast('Scan error: ' + e.message, 'fa-exclamation-circle', 'var(--danger)');
+      // Fallback to demo issues
+      state.codeIssues = JSON.parse(JSON.stringify(DEMO_CODE_ISSUES));
+      state.docIssues = JSON.parse(JSON.stringify(DEMO_DOC_ISSUES));
+      state.readmeSections = JSON.parse(JSON.stringify(DEMO_README));
+      state.totalIssues = state.codeIssues.length + state.docIssues.length;
+      setStep(3, 'Done (using sample issues)', 100);
+      await sleep(600);
+    }
+  } else {
+    // Demo scan with animation
+    const steps = [
+      { fn:()=>setStep(0,'Fetching repository contents...',25), delay:1800 },
+      { fn:()=>setStep(1,'Analyzing code quality...',60), delay:2500 },
+      { fn:()=>setStep(2,'Reviewing documentation...',90), delay:2000 },
+      { fn:()=>setStep(3,'Done — ' + (DEMO_CODE_ISSUES.length+DEMO_DOC_ISSUES.length) + ' issues found',100), delay:600 },
+    ];
+    for(const s of steps){ s.fn(); await sleep(s.delay); }
+
+    state.codeIssues = JSON.parse(JSON.stringify(DEMO_CODE_ISSUES));
+    state.docIssues = JSON.parse(JSON.stringify(DEMO_DOC_ISSUES));
+    state.readmeSections = JSON.parse(JSON.stringify(DEMO_README));
+    state.totalIssues = state.codeIssues.length + state.docIssues.length;
+  }
+
+  // Build README sections for demo
+  if(!state.ghUser){
+    state.readmeSections = JSON.parse(JSON.stringify(DEMO_README));
+  }
+
+  state.mascotState = state.totalIssues > 10 ? 'concerned' : 'happy';
+  showScreen('results');
+  renderResults();
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ========================================
+// RESULTS RENDERING
+// ========================================
+function renderResults(){
+  const name = state.selectedRepo.name || state.selectedRepo.full_name.split('/')[1] || state.selectedRepo.full_name;
+  document.getElementById('results-repo-name').textContent=name;
+  updateCounter();
+  renderIssuesList();
+  document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.toggle('active',b.dataset.tab==='code');b.setAttribute('aria-selected',b.dataset.tab==='code');});
+
+  // Show real repo indicator
+  const isReal = state.ghUser && state.ghToken;
+  const existing = document.querySelector('.scan-info');
+  if(existing) existing.remove();
+  if(isReal){
+    const info = document.createElement('div');
+    info.className = 'scan-info';
+    info.innerHTML = `<i class="fas fa-github"></i> Scanned from live repository on GitHub`;
+    document.getElementById('issues-list').parentNode.insertBefore(info, document.getElementById('issues-list'));
+  }
+}
+
+function updateCounter(){
+  const all = [...state.codeIssues,...state.docIssues];
+  const reviewed = all.filter(i=>i.reviewed).length;
+  state.reviewedCount=reviewed;
+  state.acceptedCount=all.filter(i=>i.accepted===true).length;
+  state.rejectedCount=all.filter(i=>i.accepted===false).length;
+  document.getElementById('results-counter').textContent=`${reviewed} of ${state.totalIssues} reviewed`;
+}
+
+function renderIssuesList(){
+  const list=document.getElementById('issues-list');
+  const issues=state.activeTab==='code'?state.codeIssues:state.docIssues;
+  if(!issues.length){
+    list.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--muted);"><i class="fas fa-check-circle" style="font-size:32px;color:var(--accent);margin-bottom:12px;display:block;"></i>No issues found in this category.</div>`;
+    return;
+  }
+  list.innerHTML=issues.map(iss=>{
+    const sc=iss.severity==='critical'?'sev-critical':iss.severity==='warning'?'sev-warning':'sev-info';
+    const sl=iss.severity.charAt(0).toUpperCase()+iss.severity.slice(1);
+    const si=iss.reviewed?(iss.accepted?'<i class="fas fa-check-circle" style="color:var(--accent);font-size:14px;"></i>':'<i class="fas fa-times-circle" style="color:var(--muted);font-size:14px;"></i>'):'';
+    const ln=iss.line?':'+iss.line:'';
+    return `
+      <div class="card issue-card" data-id="${iss.id}">
+        <div class="issue-header" onclick="toggleIssue('${iss.id}')">
+          ${si}<span class="sev-badge ${sc}">${sl}</span><span class="issue-path">${escHtml(iss.file)}${ln}</span><span class="issue-desc">${escHtml(iss.desc)}</span><i class="fas fa-chevron-down issue-chevron" id="chev-${iss.id}"></i>
+        </div>
+        <div class="issue-body" id="body-${iss.id}">
+          ${renderDiff(iss.diff)}
+          <div class="issue-actions">
+            <button class="btn-primary btn-sm btn-accept" onclick="acceptIssue('${iss.id}')"><i class="fas fa-check" style="font-size:11px;"></i> Accept Fix</button>
+            <button class="btn-secondary btn-sm btn-reject" onclick="rejectIssue('${iss.id}')"><i class="fas fa-times" style="font-size:11px;"></i> Reject</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderDiff(diff){
+  let h='<div class="diff-view mono">';
+  (diff.ctx||[]).forEach(l=>{h+=`<div class="diff-line diff-ctx"><span class="diff-marker"> </span><span class="diff-content">${escHtml(l)}</span></div>`;});
+  (diff.rem||[]).forEach(l=>{h+=`<div class="diff-line diff-remove"><span class="diff-marker">-</span><span class="diff-content">${escHtml(l)}</span></div>`;});
+  (diff.add||[]).forEach(l=>{h+=`<div class="diff-line diff-add"><span class="diff-marker">+</span><span class="diff-content">${escHtml(l)}</span></div>`;});
+  h+='</div>';return h;
+}
+
+function toggleIssue(id){
+  const b=document.getElementById('body-'+id),c=document.getElementById('chev-'+id);
+  b.classList.toggle('open');c.classList.toggle('open');
+}
+
+function acceptIssue(id){
+  const iss=[...state.codeIssues,...state.docIssues].find(i=>i.id===id);
+  if(!iss||iss.reviewed)return;
+  iss.reviewed=true;iss.accepted=true;
+  updateCounter();renderIssuesList();
+  toast('Fix accepted','fa-check-circle','var(--accent)');
+}
+
+function rejectIssue(id){
+  const iss=[...state.codeIssues,...state.docIssues].find(i=>i.id===id);
+  if(!iss||iss.reviewed)return;
+  iss.reviewed=true;iss.accepted=false;
+  updateCounter();renderIssuesList();
+  toast('Fix rejected','fa-times-circle','var(--muted)');
+}
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    state.activeTab=btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.toggle('active',b.dataset.tab===state.activeTab);b.setAttribute('aria-selected',b.dataset.tab===state.activeTab);});
+    renderIssuesList();
+  });
+});
+
+// ========================================
+// README REVIEW
+// ========================================
+function renderReadmeReview(){
+  const wrap=document.getElementById('readme-compare');
+  const sections = state.readmeSections && state.readmeSections.length ? state.readmeSections : DEMO_README;
+  wrap.innerHTML=`
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-file-alt"></i> Current</div>
+      <div class="readme-col">${sections.map(s=>`<div class="readme-section">${s.before||'<p style="color:var(--muted);font-style:italic;">No content</p>'}</div>`).join('')}</div>
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-file-alt"></i> Suggested</div>
+      <div class="readme-col">${sections.map(s=>`
+        <div class="readme-section">
+          <div>${s.after||'<p style="color:var(--muted);font-style:italic;">No suggestion available</p>'}</div>
+          <div class="readme-section-ctrl">
+            <button class="btn-primary btn-xs" onclick="acceptReadmeSection('${s.id}')"><i class="fas fa-check" style="font-size:10px;"></i> Accept</button>
+            <button class="btn-secondary btn-xs" onclick="rejectReadmeSection('${s.id}')"><i class="fas fa-times" style="font-size:10px;"></i> Skip</button>
+            <span id="rm-status-${s.id}" style="font-size:12px;margin-left:8px;"></span>
+          </div>
+        </div>`).join('')}</div>
+    </div>`;
+}
+
+function acceptReadmeSection(id){
+  const s=(state.readmeSections||[]).find(x=>x.id===id)||DEMO_README.find(x=>x.id===id);
+  if(!s)return;s.accepted=true;
+  const el=document.getElementById('rm-status-'+id);
+  if(el)el.innerHTML='<span style="color:var(--accent);"><i class="fas fa-check-circle"></i> Accepted</span>';
+  toast(`Section "${s.title||id}" accepted`,'fa-check-circle','var(--accent)');
+}
+
+function rejectReadmeSection(id){
+  const s=(state.readmeSections||[]).find(x=>x.id===id)||DEMO_README.find(x=>x.id===id);
+  if(!s)return;s.accepted=false;
+  const el=document.getElementById('rm-status-'+id);
+  if(el)el.innerHTML='<span style="color:var(--muted);">Skipped</span>';
+}
+
+// ========================================
+// SUMMARY
+// ========================================
+function showSummary(){
+  showScreen('summary');
+  const name=state.selectedRepo.name||state.selectedRepo.full_name.split('/')[1]||state.selectedRepo.full_name;
+  document.getElementById('summary-repo-name').textContent=name;
+  const total=state.totalIssues,accepted=state.acceptedCount,rejected=state.rejectedCount;
+  const score=total>0?Math.round(((total-(total-accepted)*.5)/total)*100):100;
+  const cs=Math.min(100,Math.max(0,score));
+  document.getElementById('stat-found').textContent=total;
+  document.getElementById('stat-fixed').textContent=accepted;
+  document.getElementById('stat-rejected').textContent=rejected;
+  const circ=2*Math.PI*68,fg=document.getElementById('score-fg'),numEl=document.getElementById('score-num');
+  fg.style.strokeDashoffset=circ;
+  if(cs>=80){fg.style.stroke='var(--accent)';numEl.style.color='var(--accent)';}
+  else if(cs>=50){fg.style.stroke='var(--warning)';numEl.style.color='var(--warning)';}
+  else{fg.style.stroke='var(--danger)';numEl.style.color='var(--danger)';}
+  setTimeout(()=>{fg.style.strokeDashoffset=circ-(circ*cs/100);},200);
+  let cur=0;const step=Math.max(1,Math.round(cs/40));
+  const ni=setInterval(()=>{cur+=step;if(cur>=cs){cur=cs;clearInterval(ni);}numEl.textContent=cur;},30);
+  state.mascotState=cs>=70?'happy':'concerned';
+}
+
+// ========================================
+// AUTH FLOW
+// ========================================
+document.getElementById('btn-signin').addEventListener('click',openModal);
+
+document.getElementById('btn-connect-token').addEventListener('click',async()=>{
+  const token=document.getElementById('token-input').value.trim();
+  const errEl=document.getElementById('token-error');
+  const btn=document.getElementById('btn-connect-token');
+
+  if(!token){
+    errEl.style.display='block';errEl.innerHTML='<i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i> Please enter a Personal Access Token.';
+    return;
+  }
+
+  errEl.style.display='none';
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Connecting...';
+
+  try{
+    const user = await validateToken(token);
+    state.ghToken=token;
+    state.ghUser=user;
+    state.isDemo=false;
+
+    // Save token to sessionStorage if checkbox checked
+    if(document.getElementById('token-remember').checked){
+      sessionStorage.setItem('gh_token',token);
+    }
+
+    toast(`Connected as ${user.login}`,'fa-check-circle','var(--accent)');
+    closeModal();
+
+    // Show dashboard and fetch repos
+    showScreen('dashboard');
+    document.getElementById('dash-subtitle').textContent='Fetching your repositories...';
+    showRepoSkeletons();
+
+    try{
+      const ghRepos = await fetchUserRepos(token);
+      // Map GitHub repos to our format
+      state.ghRepos = ghRepos.map((r,i)=>({
+        id:r.id, name:r.name, full_name:r.full_name, desc:r.description||'No description',
+        lang:r.language||'—', langColor:getLangColor(r.language),
+        stars:r.stargazers_count||0, updated:timeAgo(r.pushed_at||r.updated_at),
+        private:r.private, default_branch:r.default_branch||'main',
+        ssh_url:r.ssh_url, html_url:r.html_url
+      }));
+      document.getElementById('dash-subtitle').textContent=`${state.ghRepos.length} repositories found. Select one to scan.`;
+      renderRepos(state.ghRepos);
+    }catch(e){
+      toast('Could not fetch repos: '+e.message,'fa-exclamation-circle','var(--danger)');
+      document.getElementById('dash-subtitle').textContent='Error loading repositories. Try again.';
+      renderRepos([]);
+    }
+
+    state.mascotState='idle';
+
+  }catch(e){
+    errEl.style.display='block';
+    errEl.innerHTML=`<i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i> ${escHtml(e.message||'Invalid token. Please check and try again.')}`;
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<i class="fab fa-github" style="font-size:16px;"></i> Connect with Token';
+  }
+});
+
+// Enter key on token input
+document.getElementById('token-input').addEventListener('keydown',(e)=>{
+  if(e.key==='Enter')document.getElementById('btn-connect-token').click();
+});
+
+// Demo mode
+document.getElementById('btn-demo-mode').addEventListener('click',()=>{
+  state.isDemo=true;state.ghToken=null;state.ghUser=null;
+  state.ghRepos=DEMO_REPOS;
+  closeModal();
+  toast('Running in demo mode with sample data','fa-flask','var(--warning)');
+  showScreen('dashboard');
+  document.getElementById('dash-subtitle').textContent='Demo mode — showing sample repositories.';
+  renderRepos(DEMO_REPOS);
+  state.mascotState='idle';
+});
+
+// Navigation buttons
+document.getElementById('btn-back-dash').addEventListener('click',()=>{showScreen('dashboard');state.mascotState='idle';});
+document.getElementById('btn-go-readme').addEventListener('click',()=>{showScreen('readme');renderReadmeReview();});
+document.getElementById('btn-back-results').addEventListener('click',()=>{showScreen('results');});
+document.getElementById('btn-go-summary').addEventListener('click',showSummary);
+document.getElementById('btn-scan-another').addEventListener('click',()=>{showScreen('dashboard');state.mascotState='idle';});
+document.getElementById('btn-open-pr').addEventListener('click',()=>{
+  toast('PR draft created with accepted fixes','fa-code-branch','var(--accent)');
+});
+
+// ========================================
+// INIT
+// ========================================
+setTheme('dark');
+animate();
+
+// Check for saved token
+const savedToken = sessionStorage.getItem('gh_token');
+if(savedToken){
+  document.getElementById('token-input').value = savedToken;
+  document.getElementById('token-remember').checked = true;
+  // Auto-connect
+  (async()=>{
+    try{
+      const user = await validateToken(savedToken);
+      state.ghToken=savedToken;state.ghUser=user;
+      showScreen('dashboard');
+      document.getElementById('dash-subtitle').textContent='Fetching your repositories...';
+      showRepoSkeletons();
+      const ghRepos = await fetchUserRepos(savedToken);
+      state.ghRepos = ghRepos.map((r,i)=>({
+        id:r.id,name:r.name,full_name:r.full_name,desc:r.description||'No description',
+        lang:r.language||'—',langColor:getLangColor(r.language),
+        stars:r.stargazers_count||0,updated:timeAgo(r.pushed_at||r.updated_at),
+        private:r.private,default_branch:r.default_branch||'main',
+        ssh_url:r.ssh_url,html_url:r.html_url
+      }));
+      document.getElementById('dash-subtitle').textContent=`${state.ghRepos.length} repositories found. Select one to scan.`;
+      renderRepos(state.ghRepos);
+      state.mascotState='idle';
+      toast(`Welcome back, ${user.login}`,'fa-hand-wave','var(--accent)');
+    }catch(e){
+      sessionStorage.removeItem('gh_token');
+    }
+  })();
+}
+</script>
+</body>
+</html>
